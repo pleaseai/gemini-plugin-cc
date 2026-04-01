@@ -14,7 +14,6 @@ import {
     getGeminiAvailability,
     getGeminiLoginStatus,
     getSessionRuntimeStatus,
-    interruptAppServerTurn,
     parseStructuredOutput,
     readOutputSchema,
     runAppServerReview,
@@ -258,31 +257,22 @@ function ensureGeminiReady(cwd) {
   }
 }
 
-function buildNativeReviewTarget(target) {
-  if (target.mode === "working-tree") {
-    return { type: "uncommittedChanges" };
-  }
-
-  if (target.mode === "branch") {
-    return { type: "baseBranch", branch: target.baseRef };
-  }
-
-  return null;
-}
-
 function validateNativeReviewRequest(target, focusText) {
   if (focusText.trim()) {
     throw new Error(
-      `\`/gemini:review\` now maps directly to the built-in reviewer and does not support custom focus text. Retry with \`/gemini:adversarial-review ${focusText.trim()}\` for focused review instructions.`
+      `\`/gemini:review\` does not support custom focus text. Retry with \`/gemini:adversarial-review ${focusText.trim()}\` for focused review instructions.`
     );
   }
+}
 
-  const nativeTarget = buildNativeReviewTarget(target);
-  if (!nativeTarget) {
-    throw new Error("This `/gemini:review` target is not supported by the built-in reviewer. Retry with `/gemini:adversarial-review` for custom targeting.");
-  }
-
-  return nativeTarget;
+function buildNativeReviewPrompt(context) {
+  const template = loadPromptTemplate(ROOT_DIR, "adversarial-review");
+  return interpolateTemplate(template, {
+    REVIEW_KIND: "Code Review",
+    TARGET_LABEL: context.target.label,
+    USER_FOCUS: "Review all changes for correctness, security, and best practices.",
+    REVIEW_INPUT: context.content
+  });
 }
 
 function renderStatusPayload(report, asJson) {
@@ -338,9 +328,11 @@ async function executeReviewRun(request) {
   const focusText = request.focusText?.trim() ?? "";
   const reviewName = request.reviewName ?? "Review";
   if (reviewName === "Review") {
-    const reviewTarget = validateNativeReviewRequest(target, focusText);
+    validateNativeReviewRequest(target, focusText);
+    const context = collectReviewContext(request.cwd, target);
+    const reviewPrompt = buildNativeReviewPrompt(context);
     const result = await runAppServerReview(request.cwd, {
-      target: reviewTarget,
+      prompt: reviewPrompt,
       model: request.model,
       onProgress: request.onProgress
     });
@@ -380,11 +372,14 @@ async function executeReviewRun(request) {
 
   const context = collectReviewContext(request.cwd, target);
   const prompt = buildAdversarialReviewPrompt(context, focusText);
+  const schema = readOutputSchema(REVIEW_SCHEMA);
+  const promptWithSchema = schema
+    ? `${prompt}\n\nRespond with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`
+    : prompt;
   const result = await runAppServerTurn(context.repoRoot, {
-    prompt,
+    prompt: promptWithSchema,
     model: request.model,
     sandbox: "read-only",
-    outputSchema: readOutputSchema(REVIEW_SCHEMA),
     onProgress: request.onProgress
   });
   const parsed = parseStructuredOutput(result.finalMessage, {
@@ -910,18 +905,6 @@ async function handleCancel(argv) {
   const reference = positionals[0] ?? "";
   const { workspaceRoot, job } = resolveCancelableJob(cwd, reference);
   const existing = readStoredJob(workspaceRoot, job.id) ?? {};
-  const threadId = existing.threadId ?? job.threadId ?? null;
-  const turnId = existing.turnId ?? job.turnId ?? null;
-
-  const interrupt = await interruptAppServerTurn(cwd, { threadId, turnId });
-  if (interrupt.attempted) {
-    appendLogLine(
-      job.logFile,
-      interrupt.interrupted
-        ? `Requested Gemini turn interrupt for ${turnId} on ${threadId}.`
-        : `Gemini turn interrupt failed${interrupt.detail ? `: ${interrupt.detail}` : "."}`
-    );
-  }
 
   terminateProcessTree(job.pid ?? Number.NaN);
   appendLogLine(job.logFile, "Cancelled by user.");
@@ -953,9 +936,7 @@ async function handleCancel(argv) {
   const payload = {
     jobId: job.id,
     status: "cancelled",
-    title: job.title,
-    turnInterruptAttempted: interrupt.attempted,
-    turnInterrupted: interrupt.interrupted
+    title: job.title
   };
 
   outputCommandResult(payload, renderCancelReport(nextJob), options.json);

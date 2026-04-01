@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 import { buildEnv, installFakeGemini } from "./fake-gemini-fixture.mjs";
 import { initGitRepo, makeTempDir, run } from "./helpers.mjs";
-import { loadBrokerSession } from "../plugins/gemini/scripts/lib/broker-lifecycle.mjs";
 import { resolveStateDir } from "../plugins/gemini/scripts/lib/state.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -40,7 +39,7 @@ test("setup reports ready when fake gemini is installed and authenticated", () =
   assert.equal(result.status, 0);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ready, true);
-  assert.match(payload.gemini.detail, /advanced runtime available/);
+  assert.match(payload.gemini.detail, /gemini-cli/);
   assert.equal(payload.sessionRuntime.mode, "direct");
 });
 
@@ -103,7 +102,7 @@ test("review accepts the quoted raw argument style for built-in base-branch revi
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /Reviewed changes against main/);
+  assert.match(result.stdout, /branch diff against main/);
   assert.match(result.stdout, /No material issues found/);
 });
 
@@ -148,10 +147,10 @@ test("adversarial review accepts the same base-branch targeting as review", () =
   assert.match(result.stdout, /Missing empty-state guard/);
 });
 
-test("review includes reasoning output when the app server returns it", () => {
+test("review completes without reasoning output in headless mode", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
-  installFakeGemini(binDir, "with-reasoning");
+  installFakeGemini(binDir);
   initGitRepo(repo);
   fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
   run("git", ["add", "README.md"], { cwd: repo });
@@ -164,14 +163,15 @@ test("review includes reasoning output when the app server returns it", () => {
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Reasoning:/);
-  assert.match(result.stdout, /Reviewed the changed files and checked the likely regression paths first|Reviewed the changed files and checked the likely regression paths/i);
+  assert.match(result.stdout, /Reviewed uncommitted changes/);
+  assert.match(result.stdout, /No material issues found/);
+  assert.equal(result.stdout.includes("Reasoning:"), false, "Headless mode should not produce reasoning output");
 });
 
-test("review logs reasoning summaries and review output to the job log", () => {
+test("review logs session start and final output to the job log", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
-  installFakeGemini(binDir, "with-reasoning");
+  installFakeGemini(binDir);
   initGitRepo(repo);
   fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
   run("git", ["add", "README.md"], { cwd: repo });
@@ -187,10 +187,10 @@ test("review logs reasoning summaries and review output to the job log", () => {
   const stateDir = resolveStateDir(repo);
   const state = JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8"));
   const log = fs.readFileSync(state.jobs[0].logFile, "utf8");
-  assert.match(log, /Reasoning summary/);
-  assert.match(log, /Reviewed the changed files and checked the likely regression paths/);
-  assert.match(log, /Review output/);
-  assert.match(log, /Reviewed uncommitted changes\./);
+  assert.match(log, /Session started/);
+  assert.match(log, /Run success/);
+  assert.match(log, /Final output/);
+  assert.match(log, /Reviewed uncommitted changes/);
 });
 
 test("task --resume-last resumes the latest persisted task thread", () => {
@@ -352,7 +352,7 @@ test("task --resume acts like --resume-last without leaking the flag into the pr
 
   assert.equal(result.status, 0, result.stderr);
   const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastTurnStart.threadId, "thr_1");
+  assert.equal(fakeState.lastResume, "sess_1");
   assert.equal(fakeState.lastTurnStart.prompt, "follow up");
 });
 
@@ -397,10 +397,10 @@ test("task forwards model selection and reasoning effort to app-server turn/star
   assert.equal(fakeState.lastTurnStart.effort, "low");
 });
 
-test("task logs reasoning summaries and assistant messages to the job log", () => {
+test("task logs tool usage and final output to the job log", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
-  installFakeGemini(binDir, "with-reasoning");
+  installFakeGemini(binDir);
   initGitRepo(repo);
   fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
   run("git", ["add", "README.md"], { cwd: repo });
@@ -415,39 +415,14 @@ test("task logs reasoning summaries and assistant messages to the job log", () =
   const stateDir = resolveStateDir(repo);
   const state = JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8"));
   const log = fs.readFileSync(state.jobs[0].logFile, "utf8");
-  assert.match(log, /Reasoning summary/);
-  assert.match(log, /Inspected the prompt, gathered evidence, and checked the highest-risk paths first/);
-  assert.match(log, /Assistant message/);
+  assert.match(log, /Session started/);
+  assert.match(log, /Using tool: read_file/);
+  assert.match(log, /Run success/);
+  assert.match(log, /Final output/);
   assert.match(log, /Handled the requested task/);
 });
 
-test("task logs subagent reasoning and messages with a subagent prefix", () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  installFakeGemini(binDir, "with-subagent");
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-
-  const result = run("node", [SCRIPT, "task", "challenge the current design"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  const stateDir = resolveStateDir(repo);
-  const state = JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8"));
-  const log = fs.readFileSync(state.jobs[0].logFile, "utf8");
-  assert.match(log, /Starting subagent design-challenger via collaboration tool: wait\./);
-  assert.match(log, /Subagent design-challenger reasoning:/);
-  assert.match(log, /Questioned the retry strategy and the cache invalidation boundaries\./);
-  assert.match(log, /Subagent design-challenger:/);
-  assert.match(
-    log,
-    /The design assumes retries are harmless, but they can duplicate side effects without stronger idempotency guarantees\./
-  );
-});
+// Subagent tracking is not available in headless mode — removed.
 
 test("task waits for the main thread to complete before returning the final result", () => {
   const repo = makeTempDir();
@@ -503,35 +478,7 @@ test("task can finish after subagent work even if the parent turn/completed even
   assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
 });
 
-test("task using the shared broker still completes when Gemini CLI spawns subagents", () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  installFakeGemini(binDir, "with-subagent");
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-  fs.writeFileSync(path.join(repo, "README.md"), "hello again\n");
-
-  const env = buildEnv(binDir);
-  const review = run("node", [SCRIPT, "review"], {
-    cwd: repo,
-    env
-  });
-  assert.equal(review.status, 0, review.stderr);
-
-  if (!loadBrokerSession(repo)) {
-    return;
-  }
-
-  const result = run("node", [SCRIPT, "task", "challenge the current design"], {
-    cwd: repo,
-    env
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
-});
+// Shared broker concept removed — test removed.
 
 test("task --background enqueues a detached worker and exposes per-job status", async () => {
   const repo = makeTempDir();
@@ -762,7 +709,7 @@ test("status shows phases, hints, and the latest finished job", () => {
   assert.match(result.stdout, /Live details:/);
   assert.match(result.stdout, /Latest finished:/);
   assert.match(result.stdout, /Progress:/);
-  assert.match(result.stdout, /Session runtime: direct startup/);
+  assert.match(result.stdout, /Session runtime: direct execution/);
   assert.match(result.stdout, /Phase: reviewing/);
   assert.match(result.stdout, /Gemini CLI session ID: thr_1/);
   assert.match(result.stdout, /Resume in Gemini: gemini resume thr_1/);
@@ -1148,8 +1095,8 @@ test("result for a finished write-capable task returns the raw Gemini CLI final 
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^Handled the requested task\.\nTask prompt accepted\.\n/);
-  assert.match(result.stdout, /Gemini CLI session ID: thr_[a-z0-9]+/i);
-  assert.match(result.stdout, /Resume in Gemini: gemini resume thr_[a-z0-9]+/i);
+  assert.match(result.stdout, /Gemini CLI session ID: sess_[a-z0-9]+/i);
+  assert.match(result.stdout, /Resume in Gemini: gemini resume sess_[a-z0-9]+/i);
 });
 
 test("cancel stops an active background job and marks it cancelled", async (t) => {
@@ -1247,69 +1194,7 @@ test("cancel stops an active background job and marks it cancelled", async (t) =
   assert.match(fs.readFileSync(logFile, "utf8"), /Cancelled by user/);
 });
 
-test("cancel sends turn interrupt to the shared app-server before killing a brokered task", async () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  const fakeStatePath = path.join(binDir, "fake-gemini-state.json");
-  installFakeGemini(binDir, "interruptible-slow-task");
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-
-  const env = buildEnv(binDir);
-  const launched = run("node", [SCRIPT, "task", "--background", "--json", "investigate the flaky worker timeout"], {
-    cwd: repo,
-    env
-  });
-
-  assert.equal(launched.status, 0, launched.stderr);
-  const launchPayload = JSON.parse(launched.stdout);
-  const jobId = launchPayload.jobId;
-  assert.ok(jobId);
-
-  const stateDir = resolveStateDir(repo);
-  const runningJob = await waitFor(() => {
-    const state = JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8"));
-    const job = state.jobs.find((candidate) => candidate.id === jobId);
-    if (job?.status === "running" && job.threadId && job.turnId) {
-      return job;
-    }
-    return null;
-  }, { timeoutMs: 15000 });
-
-  const cancelResult = run("node", [SCRIPT, "cancel", jobId, "--json"], {
-    cwd: repo,
-    env
-  });
-
-  assert.equal(cancelResult.status, 0, cancelResult.stderr);
-  const cancelPayload = JSON.parse(cancelResult.stdout);
-  assert.equal(cancelPayload.status, "cancelled");
-  assert.equal(cancelPayload.turnInterruptAttempted, true);
-  assert.equal(cancelPayload.turnInterrupted, true);
-
-  await waitFor(() => {
-    const fakeState = JSON.parse(fs.readFileSync(fakeStatePath, "utf8"));
-    return fakeState.lastInterrupt ?? null;
-  });
-
-  const fakeState = JSON.parse(fs.readFileSync(fakeStatePath, "utf8"));
-  assert.deepEqual(fakeState.lastInterrupt, {
-    threadId: runningJob.threadId,
-    turnId: runningJob.turnId
-  });
-
-  const cleanup = run("node", [SESSION_HOOK, "SessionEnd"], {
-    cwd: repo,
-    env,
-    input: JSON.stringify({
-      hook_event_name: "SessionEnd",
-      cwd: repo
-    })
-  });
-  assert.equal(cleanup.status, 0, cleanup.stderr);
-});
+// Turn interrupt via broker no longer exists in headless mode — test removed.
 
 test("session end fully cleans up jobs for the ending session", async (t) => {
   const repo = makeTempDir();
@@ -1626,76 +1511,4 @@ test("stop hook does not block when Gemini CLI is not authenticated even if the 
   assert.match(allowed.stderr, /!gemini auth login/i);
 });
 
-test("commands lazily start and reuse one shared app-server after first use", async () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  const fakeStatePath = path.join(binDir, "fake-gemini-state.json");
-
-  installFakeGemini(binDir);
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-  fs.writeFileSync(path.join(repo, "README.md"), "hello again\n");
-
-  const env = buildEnv(binDir);
-
-  const review = run("node", [SCRIPT, "review"], {
-    cwd: repo,
-    env
-  });
-  assert.equal(review.status, 0, review.stderr);
-
-  const brokerSession = loadBrokerSession(repo);
-  if (!brokerSession) {
-    return;
-  }
-
-  const adversarial = run("node", [SCRIPT, "adversarial-review"], {
-    cwd: repo,
-    env
-  });
-  assert.equal(adversarial.status, 0, adversarial.stderr);
-
-  const fakeState = JSON.parse(fs.readFileSync(fakeStatePath, "utf8"));
-  assert.equal(fakeState.appServerStarts, 1);
-
-  const cleanup = run("node", [SESSION_HOOK, "SessionEnd"], {
-    cwd: repo,
-    env,
-    input: JSON.stringify({
-      hook_event_name: "SessionEnd",
-      cwd: repo
-    })
-  });
-  assert.equal(cleanup.status, 0, cleanup.stderr);
-});
-
-test("status reports shared session runtime when a lazy broker is active", () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  installFakeGemini(binDir);
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-  fs.writeFileSync(path.join(repo, "README.md"), "hello again\n");
-
-  const review = run("node", [SCRIPT, "review"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-  assert.equal(review.status, 0, review.stderr);
-
-  if (!loadBrokerSession(repo)) {
-    return;
-  }
-
-  const result = run("node", [SCRIPT, "status"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Session runtime: shared session/);
-});
+// Shared app-server broker reuse tests removed — headless mode uses independent processes.

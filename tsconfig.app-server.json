@@ -13,11 +13,9 @@
     "types": ["node"]
   },
   "include": [
-    "plugins/gemini/scripts/lib/app-server.mjs",
+    "plugins/gemini/scripts/lib/headless.mjs",
     "plugins/gemini/scripts/lib/gemini.mjs",
     "plugins/gemini/scripts/lib/fs.mjs",
-    "plugins/gemini/scripts/lib/process.mjs",
-    "plugins/gemini/scripts/lib/app-server-protocol.d.ts",
-    "plugins/gemini/.generated/app-server-types/**/*.ts"
+    "plugins/gemini/scripts/lib/process.mjs"
   ]
 }
