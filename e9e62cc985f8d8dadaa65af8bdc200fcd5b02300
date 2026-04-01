@@ -1,0 +1,39 @@
+plugins/gemini/scripts/gemini-companion.mjs
+  5d201b3c7d9a12ab 70-72,83
+tests/fake-gemini-fixture.mjs
+  5d201b3c7d9a12ab 188,195,203-206,241,275,517,519-520
+plugins/gemini/commands/rescue.md
+  5d201b3c7d9a12ab 3,46
+plugins/gemini/scripts/lib/render.mjs
+  5d201b3c7d9a12ab 186,403
+tests/commands.test.mjs
+  5d201b3c7d9a12ab 96,107,127-128,140,148-149,204
+tests/runtime.test.mjs
+  5d201b3c7d9a12ab 389,396,665
+plugins/gemini/skills/gemini-cli-runtime/SKILL.md
+  5d201b3c7d9a12ab 23,29
+README.md
+  5d201b3c7d9a12ab 18-19,27,148-149,162,258,261,285,305
+plugins/gemini/agents/gemini-rescue.md
+  5d201b3c7d9a12ab 30-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "e9e62cc985f8d8dadaa65af8bdc200fcd5b02300",
+  "prompts": {
+    "5d201b3c7d9a12ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72ddaec4-c46f-4e50-8ab4-962c1013807e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Minsu Lee",
+      "messages": [],
+      "total_additions": 58,
+      "total_deletions": 52,
+      "accepted_lines": 44,
+      "overriden_lines": 0
+    }
+  }
+}
