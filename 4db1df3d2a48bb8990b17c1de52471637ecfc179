@@ -1,0 +1,35 @@
+tsconfig.app-server.json
+  5d201b3c7d9a12ab 16,19
+plugins/gemini/scripts/lib/headless.mjs
+  5d201b3c7d9a12ab 1-259
+tests/runtime.test.mjs
+  5d201b3c7d9a12ab 42,105,150,166-168,171,190-193,355,400,418-421,425,481,712,1098-1099,1197,1514
+plugins/gemini/scripts/gemini-companion.mjs
+  5d201b3c7d9a12ab 263,268-275,331-333,335,375-378,380,939
+tests/fake-gemini-fixture.mjs
+  5d201b3c7d9a12ab 14-15,17-22,28-29,32-33,36,38-40,43-49,52-53,56-61,64-83,87-88,91-116,118,121-124,126-141,144-158,160-164,166-172,175-176,186-187,209-211,214,219
+plugins/gemini/scripts/lib/gemini.mjs
+  5d201b3c7d9a12ab 5,36,38-39,42-44,46-47,50,53-57,59-64,68,71-75,77-84,87,91,94,97-98,137-143,149,152-155,157-162,164-175,181,184-187,189-196,199,201-214,216-217
+plugins/gemini/scripts/session-lifecycle-hook.mjs
+  5d201b3c7d9a12ab 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "4db1df3d2a48bb8990b17c1de52471637ecfc179",
+  "prompts": {
+    "5d201b3c7d9a12ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72ddaec4-c46f-4e50-8ab4-962c1013807e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Minsu Lee",
+      "messages": [],
+      "total_additions": 567,
+      "total_deletions": 1546,
+      "accepted_lines": 563,
+      "overriden_lines": 0
+    }
+  }
+}
