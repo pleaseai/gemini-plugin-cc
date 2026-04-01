@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Codex CLI
-        run: npm install -g @openai/codex
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
 
       - name: Run test suite
         run: npm test
