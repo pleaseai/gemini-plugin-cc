@@ -34,4 +34,4 @@ If Gemini CLI is already installed or npm is unavailable:
 Output rules:
 - Present the final setup output to the user.
 - If installation was skipped, present the original setup output.
-- If Gemini CLI is installed but not authenticated, preserve the guidance to run `!gemini auth login`.
+- If Gemini CLI is installed but not authenticated, preserve the guidance to run `!gemini` once (Google Sign-in) or to set `GEMINI_API_KEY`.

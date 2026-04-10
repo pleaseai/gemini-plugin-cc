@@ -63,7 +63,7 @@ function buildSetupNote(cwd) {
   }
 
   const detail = authStatus.detail ? ` ${authStatus.detail}.` : "";
-  return `Gemini CLI is not set up for the review gate.${detail} Run /gemini:setup and, if needed, !gemini auth login.`;
+  return `Gemini CLI is not set up for the review gate.${detail} Run /gemini:setup and, if needed, run !gemini once to sign in or set GEMINI_API_KEY.`;
 }
 
 function parseStopReviewOutput(rawOutput) {

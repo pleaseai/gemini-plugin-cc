@@ -191,8 +191,8 @@ function buildSetupReport(cwd, actionsTaken = []) {
     nextSteps.push("Install Gemini CLI with `npm install -g @google/gemini-cli`.");
   }
   if (geminiStatus.available && !authStatus.loggedIn) {
-    nextSteps.push("Run `!gemini auth login`.");
-    nextSteps.push("If browser login is blocked, retry with `!gemini auth login --device-auth` or `!gemini auth login --with-api-key`.");
+    nextSteps.push("Run `!gemini` once and complete Google Sign-in (credentials are cached under `~/.gemini/oauth_creds.json`).");
+    nextSteps.push("Or set `GEMINI_API_KEY` (AI Studio) — alternatively `GOOGLE_API_KEY`/`GOOGLE_APPLICATION_CREDENTIALS` with `GOOGLE_CLOUD_PROJECT` for Vertex AI.");
   }
   if (!config.stopReviewGate) {
     nextSteps.push("Optional: run `/gemini:setup --enable-review-gate` to require a fresh review before stop.");
@@ -253,7 +253,7 @@ function ensureGeminiReady(cwd) {
     throw new Error("Gemini CLI is not installed or is missing required runtime support. Install it with `npm install -g @google/gemini-cli`, then rerun `/gemini:setup`.");
   }
   if (!authStatus.loggedIn) {
-    throw new Error("Gemini CLI is not authenticated. Run `!gemini auth login` and retry.");
+    throw new Error("Gemini CLI is not authenticated. Run `!gemini` once to complete Google Sign-in, or set `GEMINI_API_KEY`, then retry.");
   }
 }
 

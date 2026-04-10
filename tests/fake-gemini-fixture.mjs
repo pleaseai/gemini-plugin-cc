@@ -40,19 +40,6 @@ if (args[0] === "--version") {
   process.exit(0);
 }
 
-if (args[0] === "auth" && args[1] === "status") {
-  if (BEHAVIOR === "logged-out") {
-    console.error("not authenticated");
-    process.exit(1);
-  }
-  console.log("logged in");
-  process.exit(0);
-}
-
-if (args[0] === "auth") {
-  process.exit(0);
-}
-
 if (args[0] === "--list-sessions") {
   const state = loadState();
   for (const session of state.sessions) {
@@ -228,10 +215,24 @@ function buildResponse(prompt, resume) {
   }
 }
 
-export function buildEnv(binDir) {
+export function buildEnv(binDir, { loggedIn = true } = {}) {
   const sep = process.platform === "win32" ? ";" : ":";
-  return {
+  const env = {
     ...process.env,
-    PATH: `${binDir}${sep}${process.env.PATH}`
+    PATH: `${binDir}${sep}${process.env.PATH}`,
+    // Force a clean auth state so getGeminiLoginStatus doesn't inspect the
+    // developer's real ~/.gemini credentials during tests.
+    HOME: binDir,
+    USERPROFILE: binDir
   };
+  // Strip any auth-relevant env vars that might leak in from the developer
+  // environment so each test can decide the auth state explicitly.
+  delete env.GEMINI_API_KEY;
+  delete env.GOOGLE_API_KEY;
+  delete env.GOOGLE_APPLICATION_CREDENTIALS;
+  delete env.GOOGLE_CLOUD_PROJECT;
+  if (loggedIn) {
+    env.GEMINI_API_KEY = "fake-test-key";
+  }
+  return env;
 }

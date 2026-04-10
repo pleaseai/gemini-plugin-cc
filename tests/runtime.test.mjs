@@ -52,7 +52,10 @@ test("setup is ready without npm when Gemini CLI is already installed and authen
     cwd: ROOT,
     env: {
       ...process.env,
-      PATH: binDir
+      PATH: binDir,
+      HOME: binDir,
+      USERPROFILE: binDir,
+      GEMINI_API_KEY: "fake-test-key"
     }
   });
 
@@ -1486,29 +1489,31 @@ test("stop hook does not block when Gemini CLI is unavailable even if the review
 test("stop hook does not block when Gemini CLI is not authenticated even if the review gate is enabled", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
-  installFakeGemini(binDir, "logged-out");
+  installFakeGemini(binDir);
   initGitRepo(repo);
   fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
   run("git", ["add", "README.md"], { cwd: repo });
   run("git", ["commit", "-m", "init"], { cwd: repo });
 
+  const loggedOutEnv = buildEnv(binDir, { loggedIn: false });
+
   const setup = run("node", [SCRIPT, "setup", "--enable-review-gate", "--json"], {
     cwd: repo,
-    env: buildEnv(binDir)
+    env: loggedOutEnv
   });
   assert.equal(setup.status, 0, setup.stderr);
 
   const allowed = run("node", [STOP_HOOK], {
     cwd: repo,
-    env: buildEnv(binDir),
+    env: loggedOutEnv,
     input: JSON.stringify({ cwd: repo })
   });
 
   assert.equal(allowed.status, 0, allowed.stderr);
   assert.equal(allowed.stdout.trim(), "");
   assert.match(allowed.stderr, /Gemini CLI is not set up for the review gate/i);
-  assert.match(allowed.stderr, /not authenticated/i);
-  assert.match(allowed.stderr, /!gemini auth login/i);
+  assert.match(allowed.stderr, /no cached Google Sign-in or API key detected/i);
+  assert.match(allowed.stderr, /!gemini/i);
 });
 
 // Shared app-server broker reuse tests removed — headless mode uses independent processes.

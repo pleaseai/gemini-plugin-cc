@@ -56,8 +56,10 @@ npm install -g @google/gemini-cli
 If Gemini CLI is installed but not logged in yet, run:
 
 ```bash
-!gemini auth login
+!gemini
 ```
+
+Complete the Google Sign-in in the browser (credentials are cached under `~/.gemini/oauth_creds.json`), or set `GEMINI_API_KEY` from AI Studio before running `/gemini:setup` again. Vertex AI users can instead set `GOOGLE_API_KEY` or `GOOGLE_APPLICATION_CREDENTIALS` together with `GOOGLE_CLOUD_PROJECT`.
 
 After install, you should see:
 
@@ -282,7 +284,7 @@ This way you can review the Gemini CLI work or continue the work there.
 
 If you are already signed into Gemini CLI on this machine, that account should work immediately here too. This plugin uses your local Gemini CLI authentication.
 
-If you only use Claude Code today and have not used Gemini CLI yet, you will also need to sign in to Gemini CLI with a Google account or API key. Run `/gemini:setup` to check whether Gemini CLI is ready, and use `!gemini auth login` if it is not.
+If you only use Claude Code today and have not used Gemini CLI yet, you will also need to sign in to Gemini CLI with a Google account or API key. Run `/gemini:setup` to check whether Gemini CLI is ready, and run `!gemini` once (or set `GEMINI_API_KEY`) if it is not.
 
 ### Does the plugin use a separate Gemini runtime?
 

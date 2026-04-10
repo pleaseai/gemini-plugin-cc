@@ -195,7 +195,7 @@ test("hooks keep session-end cleanup and stop gating enabled", () => {
   assert.match(source, /session-lifecycle-hook\.mjs/);
 });
 
-test("setup command can offer Gemini CLI install and still points users to gemini auth login", () => {
+test("setup command can offer Gemini CLI install and guides users to sign in", () => {
   const setup = read("commands/setup.md");
   const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
 
@@ -203,7 +203,8 @@ test("setup command can offer Gemini CLI install and still points users to gemin
   assert.match(setup, /AskUserQuestion/);
   assert.match(setup, /npm install -g @google\/gemini-cli/);
   assert.match(setup, /gemini-companion\.mjs" setup --json \$ARGUMENTS/);
-  assert.match(readme, /!gemini auth login/);
+  assert.match(readme, /!gemini\b/);
+  assert.match(readme, /GEMINI_API_KEY/);
   assert.match(readme, /offer to install Gemini CLI for you/i);
   assert.match(readme, /\/gemini:setup --enable-review-gate/);
   assert.match(readme, /\/gemini:setup --disable-review-gate/);
